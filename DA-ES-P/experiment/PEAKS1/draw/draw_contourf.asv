@@ -1,0 +1,70 @@
+x = linspace(-5,5,100);
+y = linspace(-5,5,100);
+[X,Y] = meshgrid(x,y);
+Z = Fun(X,Y);
+figure;
+D = 2;
+lambda = 7 + floor(3*log(D));
+min_popsize = 7 + floor(3*log(D));
+% 设置颜色条
+% space = 256;
+% blue_map = [linspace(1, 0, space)', linspace(1, 0, space)', linspace(1, 0, space)'];% 黑色的RGB值
+% colormap(blue_map);
+
+contour(X,Y,Z,"k","LineStyle","-");
+for seed = 1:100
+    bestmem_set = [0 0];
+    bestval_set = [-999];
+    bestval = -999;
+    algRand = RandStream.create('mt19937ar','seed', seed);
+    RandStream.setGlobalStream(algRand);
+    xmean1 = [-sqrt(3)/2,-0.5];
+    xmean2 = [ sqrt(3)/2,-0.5];
+    xmean3 = [ 0,1];
+    pop1 = xmean1 + randn(algRand,lambda,2);
+    pop2 = xmean2 + randn(algRand,lambda,2);
+    pop3 = xmean3 + randn(algRand,lambda,2);
+    pop = [pop1;pop2;pop3];
+    groups = struct();
+    for i = 1:3
+        groups(i).idx = i;
+        groups(i).OPTS.first = 1;
+        groups(i).OPTS.pop = pop((i-1)*lambda+1:i*lambda,:);
+        groups(i).OPTS.val = Fits(groups(i).OPTS.pop);
+        groups(i).xmean = mean(groups(i).OPTS.pop)';
+        x = groups(i).OPTS.pop - groups(i).xmean';
+        groups(i).OPTS.sigma = 0.5;
+        groups(i).OPTS.count = 0;
+        groups(i).cc = std(groups(i).OPTS.val);
+        [~,index] = sort(groups(i).OPTS.val,"descend");
+        groups(i).bestval = max(groups(i).OPTS.val);
+        groups(i).bestmem = groups(i).OPTS.pop(index(1),:);
+        groups(i).delta = 0;
+        groups(i).iters = 0;
+    end
+    itermax = 1;
+    for i = 1:3  
+        while groups(i).iters<=50
+            new_groups =  ES_test(groups(i), -5, 5, itermax, algRand);
+            groups(i) = new_groups;
+            bestval = max(groups(i).bestval,bestval);
+            if groups(i).cc<=1e-7
+                if ~isempty(bestmem_set)
+                    dis_arr = pdist2(groups(i).bestmem, bestmem_set);
+                    if min(dis_arr) >= 1e-3
+                        bestmem_set = [bestmem_set; groups(i).bestmem];
+                        bestval_set = [bestval_set; groups(i).bestval];
+                    else
+                        fprintf('---Find the case!The seed is %d\n',seed);
+                        break;
+                    end
+                    
+                end
+            end
+        end
+
+    end
+end
+title('Fig2.');
+xlabel('X');
+ylabel('Y');
